@@ -358,6 +358,14 @@ void Match::printOneMatchField(
     output_file->setColumnCurrentRow((MATCH_COLUMNS_T)column_idx,
                                      getScore(TAILOR_SCORE));
     break;
+  case DP_PEPT_SCORE_COL:     //Added for best scoring peptide from DP by AKF
+    output_file->setColumnCurrentRow((MATCH_COLUMNS_T)column_idx,
+                                     getScore(DP_PEPT_SCORE));
+    break;
+  case DP_PEPT_TAILOR_COL:     //Added for best scoring peptide from DP by AKF
+    output_file->setColumnCurrentRow((MATCH_COLUMNS_T)column_idx,
+                                     getScore(DP_PEPT_TAILOR));
+    break;
   case QVALUE_TDC_COL:
 //    if (null_peptide_ == false) {
       output_file->setColumnCurrentRow((MATCH_COLUMNS_T)column_idx, 

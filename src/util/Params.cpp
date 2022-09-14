@@ -775,6 +775,21 @@ Params::Params() : finalized_(false) {
     "Fast, but heuristic PSM score calibration[[html: as described in "
     "<a href=\"https://pubmed.ncbi.nlm.nih.gov/32175744/\">this article</a>]].",
     "Available for tide-search", true);    
+  InitBoolParam("DP-peptide", false,
+    "Extract the best scoring peptide sequence from the Dynamic Programming table with "
+    "backtracking.[[html: as described in <a href=\"\">TBA</a>]].",
+    "Available for tide-search", true);    
+ //Added by AKF
+  InitBoolParam("cross-corr-penalty", true,
+    "Applyies the cross-correlation penalty for XCorr[[html: as described in "
+    "<a href=\"\">TBA</a>]].",
+    "Available for tide-search", true);     
+  InitDoubleParam("xpv-precision", 0.1, 0.001, 1,
+    "Determines the precision on the exact p value caculation for high resolution MS2 data. ",
+    "Available for tide-search", true);         	    
+  InitDoubleParam("max-spectrum_neutral-mass", 10000000, 0, 10000000,
+    "Determines the precision on the exact p value caculation for high resolution MS2 data. ",
+    "Available for tide-search", true);         	    
   InitStringParam("store-index", "",
     "When providing a FASTA file as the index, the generated binary index will be stored at "
     "the given path. This option has no effect if a binary index is provided as the index.",

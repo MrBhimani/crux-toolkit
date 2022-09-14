@@ -601,6 +601,11 @@ void TideMatchSet::writeToFile(
       if (Params::GetBool("use-tailor-calibration")) {
         *file << StringUtils::ToString(i->tailor, precision, true) << '\t';
       }
+      if (Params::GetBool("DP-peptide")){ //Added by AKF for reporting the best scoring peptide seq from DP table
+        *file << StringUtils::ToString(i->DPPeptideScore, precision, true) << '\t';
+        *file << StringUtils::ToString(i->DPPeptideTailor, precision, true) << '\t';
+        *file << i->DPPeptideSeq << '\t';
+      }                  	        
       break;
     case RESIDUE_EVIDENCE_MATRIX:
       if (exact_pval_search_) {
@@ -744,6 +749,11 @@ void TideMatchSet::writeHeaders(
         if (Params::GetBool("use-tailor-calibration")) {
           colPrint(&writtenHeader, file, get_column_header(TAILOR_COL));
         }
+        if (Params::GetBool("DP-peptide")){   //Added for best scoring peptide from DP by AKF        
+          colPrint(&writtenHeader, file, get_column_header(DP_PEPT_SCORE_COL));
+          colPrint(&writtenHeader, file, get_column_header(DP_PEPT_TAILOR_COL));
+          colPrint(&writtenHeader, file, get_column_header(DP_PEPT_SEQ_COL));
+        }                  		        
         if (!brief) {
           colPrint(&writtenHeader, file, get_column_header(XCORR_RANK_COL));
         }

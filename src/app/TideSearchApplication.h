@@ -139,11 +139,6 @@ class TideSearchApplication : public CruxApplication {
     ofstream* target_file,
     ofstream* decoy_file,
     bool compute_sp,
-    int nAA,
-    double* aaFreqN,
-    double* aaFreqI,
-    double* aaFreqC,
-    int* aaMass,
     int nAARes,
     const vector<double>& dAAFreqN,
     const vector<double>& dAAFreqI,
@@ -280,11 +275,6 @@ class TideSearchApplication : public CruxApplication {
     bool compute_sp;
     int64_t thread_num;
     int64_t num_threads;
-    int nAA;
-    double* aaFreqN;
-    double* aaFreqI;
-    double* aaFreqC;
-    int* aaMass;
     int nAARes;
     const vector<double>* dAAFreqN;
     const vector<double>* dAAFreqI;
@@ -309,9 +299,8 @@ class TideSearchApplication : public CruxApplication {
             WINDOW_TYPE_T window_type_, double spectrum_min_mz_, double spectrum_max_mz_,
             int min_scan_, int max_scan_, int min_peaks_, int search_charge_, int top_matches_,
             double highest_mz_, ofstream* target_file_,
-            ofstream* decoy_file_, bool compute_sp_, int64_t thread_num_, int64_t num_threads_, int nAA_,
-            double* aaFreqN_, double* aaFreqI_, double* aaFreqC_, int* aaMass_, int nAARes_,
-            const vector<double>* dAAFreqN_, const vector<double>* dAAFreqI_,
+            ofstream* decoy_file_, bool compute_sp_, int64_t thread_num_, int64_t num_threads_, 
+            int nAARes_,  const vector<double>* dAAFreqN_, const vector<double>* dAAFreqI_,
             const vector<double>* dAAFreqC_, const vector<double>* dAAMass_,
             const pb::ModTable* mod_table_, const pb::ModTable* nterm_mod_table_, const pb::ModTable* cterm_mod_table_, const int decoysPerTarget_,
             vector<boost::mutex*> locks_array_, double bin_width_, double bin_offset_, bool exact_pval_search_,
@@ -322,8 +311,8 @@ class TideSearchApplication : public CruxApplication {
             spectrum_min_mz(spectrum_min_mz_), spectrum_max_mz(spectrum_max_mz_), min_scan(min_scan_), max_scan(max_scan_),
             min_peaks(min_peaks_), search_charge(search_charge_), top_matches(top_matches_), highest_mz(highest_mz_),
             target_file(target_file_), decoy_file(decoy_file_), compute_sp(compute_sp_),
-            thread_num(thread_num_), num_threads(num_threads_), nAA(nAA_), aaFreqN(aaFreqN_), aaFreqI(aaFreqI_), aaFreqC(aaFreqC_),
-            aaMass(aaMass_), nAARes(nAARes_), dAAFreqN(dAAFreqN_), dAAFreqI(dAAFreqI_), dAAFreqC(dAAFreqC_), dAAMass(dAAMass_),
+            thread_num(thread_num_), num_threads(num_threads_), 
+            nAARes(nAARes_), dAAFreqN(dAAFreqN_), dAAFreqI(dAAFreqI_), dAAFreqC(dAAFreqC_), dAAMass(dAAMass_),
             mod_table(mod_table_), nterm_mod_table(nterm_mod_table_), cterm_mod_table(cterm_mod_table_), decoysPerTarget(decoysPerTarget_),
             locks_array(locks_array_), bin_width(bin_width_), bin_offset(bin_offset_), exact_pval_search(exact_pval_search_),
             spectrum_flag(spectrum_flag_), sc_index(sc_index_), total_candidate_peptides(total_candidate_peptides_), negative_isotope_errors(negative_isotope_errors_) {}
@@ -338,12 +327,35 @@ class TideSearchApplication : public CruxApplication {
     int maxScore,
     int minScore,
     int nAA,
-    double* aaFreqN,
-    double* aaFreqI,
-    double* aaFreqC,
-    int* aaMass,
+    const vector<double>& aaFreqN,
+    const vector<double>& aaFreqI,
+    const vector<double>& aaFreqC,
+    const vector<int>& aaMass,
     double* pValueScoreObs
   );
+  // Added by AKF
+  map<double, std::string> mMass2AA;  
+  int calcScoreCountHighRes(
+    int numelEvidenceObs,
+    int* evidenceObs,
+    int pepMassInt,
+    double pepMassDouble,
+    int maxEvidence,
+    int minEvidence,
+    int maxScore,
+    int minScore,
+    double precision,
+    double bin_width,
+    double bin_offset,
+    int nAA,
+    const vector<double>& aaFreqN,
+    const vector<double>& aaFreqI,
+    const vector<double>& aaFreqC,
+    const vector<double>& aaMass,
+    vector< pair <int,int> >* vBacktracking,
+    double* pValueScoreObs
+  );
+
 
   void calcResidueScoreCount (
     int nAa,

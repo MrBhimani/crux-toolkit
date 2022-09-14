@@ -54,12 +54,16 @@ class ActivePeptideQueue {
   deque<TheoreticalPeakSetBIons> b_ion_queue_;
   deque<TheoreticalPeakSetBIons>::const_iterator iter1_, end1_;
  
+  int CountAAFrequency( vector<double>& dAAFreqN, vector<double>& dAAFreqI, vector<double>& dAAFreqC, 
+                          vector<double>& dAAMass, map<double, std::string>& mMass2AA);
+
   int CountAAFrequency(double binWidth, double binOffset, double** dAAFreqN,
-                       double** dAAFreqI, double** dAAFreqC, int** dAAMass);
+                       double** dAAFreqI, double** dAAFreqC, int** iAAMass);
   //Added by Andy Lin for RESIDUE_EVIDENCE_MATRIX
   int CountAAFrequencyRes(double binWidth, double binOffset, vector<double>& dAAFreqN,
-                          vector<double>& dAAFreqI, vector<double>& dAAFreqC, vector<double>& dAAMass);
-  
+                          vector<double>& dAAFreqI, vector<double>& dAAFreqC, 
+                          vector<double>& dAAMass, map<double, std::string>& mMass2AA);  //Modified by AKF
+   
   int ActiveTargets() const { return active_targets_; }
   int ActiveDecoys() const { return active_decoys_; }
 

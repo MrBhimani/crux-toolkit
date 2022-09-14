@@ -31,6 +31,9 @@ enum MATCH_COLUMNS_T {
   BOTH_PVALUE_RANK, //Added by Andy Lin
   SIDAK_ADJUSTED_COL,  
   TAILOR_COL,  //Added for tailor score calibration method by AKF  
+  DP_PEPT_SCORE_COL,  //Added for best scoring peptide from DP by AKF
+  DP_PEPT_TAILOR_COL,  //Added for best scoring peptide from DP by AKF
+  DP_PEPT_SEQ_COL,  //Added for best scoring peptide from DP by AKF    
   EVALUE_COL,
   ELUTION_WINDOW_COL,
   DISTINCT_MATCHES_PEPTIDE_COL,

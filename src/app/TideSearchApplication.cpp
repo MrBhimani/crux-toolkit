@@ -20,6 +20,9 @@
 #define TAILOR_QUANTILE_TH 0.01
 #define TAILOR_OFFSET 5.0
 
+#define BIN_WIDTH_TH 1.0
+
+
 bool TideSearchApplication::HAS_DECOYS = false;
 bool TideSearchApplication::PROTEIN_LEVEL_DECOYS = false;
 
@@ -142,14 +145,14 @@ int TideSearchApplication::main(const vector<string>& input_files, const string 
 
   // for now don't allow XCorr p-value or combined p-values
   // searches with variable bin width
-  if (exact_pval_search_ && bin_width_ != MassConstants::bin_width_) {
-    carp(CARP_FATAL, "Computing exact p-value (i.e setting exact-p-value=T) requires that mz-bin-width be set to 1.0005079");
-  }
+  // if (exact_pval_search_ && bin_width_ != MassConstants::bin_width_) {
+    // carp(CARP_FATAL, "Computing exact p-value (i.e setting exact-p-value=T) requires that mz-bin-width be set to 1.0005079");
+  // }
 
   // Check that combined p-value is with exact-p-value=T
   SCORE_FUNCTION_T curScoreFunction = string_to_score_function_type(Params::GetString("score-function"));
-  if (curScoreFunction == BOTH_SCORE && !exact_pval_search_) {
-    carp(CARP_FATAL, "--score-function 'both' must be run with exact-p-value=T");
+  if (curScoreFunction == BOTH_SCORE && !exact_pval_search_ && bin_width_ != MassConstants::bin_width_) {
+    carp(CARP_FATAL, "--score-function 'both' must be run with exact-p-value=T with mz-bin-width be set to 1.0005079");
   }
 
   // TODO res-ev not implemented with flanking_peak, neutral_loss_peak,
@@ -166,12 +169,16 @@ int TideSearchApplication::main(const vector<string>& input_files, const string 
   }
   
   //Tailor score calibration does not support res-ev scores or refactored xcorrs //Added by AKF
-  if (Params::GetBool("use-tailor-calibration") && exact_pval_search_ )
-    carp(CARP_FATAL, "--exact-p-value T is not implemented with Tailor score "
-                    "calibration method");
+  // if (Params::GetBool("use-tailor-calibration") && exact_pval_search_ )
+    // carp(CARP_FATAL, "--exact-p-value T is not implemented with Tailor score "
+                    // "calibration method");
 
   if (Params::GetBool("use-tailor-calibration") && curScoreFunction == RESIDUE_EVIDENCE_MATRIX )
     carp(CARP_FATAL, "--score-function 'residue-evidence' is not implemented "
+                    "with Tailor score calibration method");
+
+  if (Params::GetBool("use-tailor-calibration") && curScoreFunction == BOTH_SCORE )
+    carp(CARP_FATAL, "--score-function 'both' is not implemented "
                     "with Tailor score calibration method");
 
   // Check compute-sp parameter
@@ -212,15 +219,6 @@ int TideSearchApplication::main(const vector<string>& input_files, const string 
   }
   carp(CARP_INFO, "Read %d target proteins", targetProteinCount);
 
-  // Open a copy of peptide buffer for Amino Acid Frequency (AAF) calculation.
-  // Is used for curScoreFunction = XCORR_SCORE
-  // contains frequency of amino acid masses (masses are binned)
-  double* aaFreqN = NULL;
-  double* aaFreqI = NULL;
-  double* aaFreqC = NULL;
-  int* aaMass = NULL;
-  int nAA = 0;
-
   // Is used for curScoreFunction = RESIDUE_EVIDENCE_MATRIX
   // contains frequency of amino acid masses (masses are not binned)
   vector<double> dAAFreqN;
@@ -229,7 +227,7 @@ int TideSearchApplication::main(const vector<string>& input_files, const string 
   vector<double> dAAMass;
   int nAARes = 0;
 
-  if (curScoreFunction == RESIDUE_EVIDENCE_MATRIX || curScoreFunction == BOTH_SCORE) {
+  if (curScoreFunction == RESIDUE_EVIDENCE_MATRIX || curScoreFunction == BOTH_SCORE || exact_pval_search_) {
     pb::Header aaf_peptides_header;
     HeadedRecordReader aaf_peptide_reader(peptides_file, &aaf_peptides_header);
 
@@ -248,35 +246,9 @@ int TideSearchApplication::main(const vector<string>& input_files, const string 
     ActivePeptideQueue* active_peptide_queue =
       new ActivePeptideQueue(aaf_peptide_reader.Reader(), proteins);
 
-    nAARes = active_peptide_queue->CountAAFrequencyRes(bin_width_, bin_offset_,
-                                                       dAAFreqN, dAAFreqI, dAAFreqC, dAAMass);
+    nAARes = active_peptide_queue->CountAAFrequency(dAAFreqN, dAAFreqI, dAAFreqC, dAAMass, mMass2AA);
     delete active_peptide_queue;
   }
-
-  // For SCORE_FUNCTION=="XCORR_SCORE" with p-val=T or SCORE_FUNCTION=="BOTH_SCORE"
-  if (exact_pval_search_ && (curScoreFunction == XCORR_SCORE || curScoreFunction == BOTH_SCORE)) {
-    pb::Header aaf_peptides_header;
-    HeadedRecordReader aaf_peptide_reader(peptides_file, &aaf_peptides_header);
-
-    if (( aaf_peptides_header.file_type() != pb::Header::PEPTIDES) ||
-         !aaf_peptides_header.has_peptides_header()) {
-      carp(CARP_FATAL, "Error reading index (%s)", peptides_file.c_str());
-    }
-
-    MassConstants::Init(&aaf_peptides_header.peptides_header().mods(),
-                        &aaf_peptides_header.peptides_header().nterm_mods(),
-                        &aaf_peptides_header.peptides_header().cterm_mods(),
-                        &aaf_peptides_header.peptides_header().nprotterm_mods(),
-                        &aaf_peptides_header.peptides_header().cprotterm_mods(),
-                        bin_width_, bin_offset_);
-
-    ActivePeptideQueue* active_peptide_queue =
-      new ActivePeptideQueue(aaf_peptide_reader.Reader(), proteins);
-
-    nAA = active_peptide_queue->CountAAFrequency(bin_width_, bin_offset_,
-                                                 &aaFreqN, &aaFreqI, &aaFreqC, &aaMass);
-    delete active_peptide_queue;
-  } // End calculation of amino acid frequencies.
 
   // Read auxlocs index file
   carp(CARP_INFO, "Reading auxiliary locations.");  
@@ -390,7 +362,6 @@ int TideSearchApplication::main(const vector<string>& input_files, const string 
            min_scan, max_scan, Params::GetInt("min-peaks"), charge_to_search,
            Params::GetInt("top-match"), spectra->FindHighestMZ(),
            target_file, decoy_file, compute_sp,
-           nAA, aaFreqN, aaFreqI, aaFreqC, aaMass,
            nAARes, dAAFreqN, dAAFreqI, dAAFreqC, dAAMass,
            pepHeader.mods(), pepHeader.nterm_mods(), pepHeader.cterm_mods(),
            decoysPerTarget, &negative_isotope_errors);
@@ -425,10 +396,6 @@ int TideSearchApplication::main(const vector<string>& input_files, const string 
       delete decoy_file;
     }
   }
-  delete[] aaFreqN;
-  delete[] aaFreqI;
-  delete[] aaFreqC;
-  delete[] aaMass;
 
   return 0;
 }
@@ -538,11 +505,6 @@ void TideSearchApplication::search(void* threadarg) {
   bool compute_sp = my_data->compute_sp;
   int64_t thread_num = my_data->thread_num;
   int64_t num_threads = my_data->num_threads;
-  int nAA = my_data->nAA;
-  double* aaFreqN = my_data->aaFreqN;
-  double* aaFreqI = my_data->aaFreqI;
-  double* aaFreqC = my_data->aaFreqC;
-  int* aaMass = my_data->aaMass;
   int nAARes = my_data->nAARes;
   const vector<double> dAAFreqN = *(my_data->dAAFreqN);
   const vector<double> dAAFreqI = *(my_data->dAAFreqI);
@@ -569,6 +531,7 @@ void TideSearchApplication::search(void* threadarg) {
   bool use_neutral_loss_peaks = Params::GetBool("use-neutral-loss-peaks");
   bool use_flanking_peaks = Params::GetBool("use-flanking-peaks");
   int max_charge = Params::GetInt("max-precursor-charge");
+  double max_spectrum_neutral_mass = Params::GetDouble("max-spectrum_neutral-mass");
   // Added by Andy Lin on 2/9/2016
   // Determines which score function to use for scoring PSMs and store in SCORE_FUNCTION enum
   SCORE_FUNCTION_T curScoreFunction = string_to_score_function_type(Params::GetString("score-function"));
@@ -587,6 +550,7 @@ void TideSearchApplication::search(void* threadarg) {
   // cycle through spectrum-charge pairs, sorted by neutral mass
   FLOAT_T sc_total = (FLOAT_T)spec_charges->size();
   int print_interval = Params::GetInt("print-search-progress");
+  double fragmentIonMassRoundingPrecision = Params::GetDouble("xpv-precision"); //   0.02;
 
   for (vector<SpectrumCollection::SpecCharge>::const_iterator sc = spec_charges->begin()+thread_num;
        sc < spec_charges->begin() + (spec_charges->size());
@@ -621,6 +585,9 @@ void TideSearchApplication::search(void* threadarg) {
         scan_num < min_scan || scan_num > max_scan ||
         spectrum->Size() < min_peaks ||
         (search_charge != 0 && charge != search_charge) || charge > max_charge) {
+      continue;
+    }
+    if (precursorMass > max_spectrum_neutral_mass) {
       continue;
     }
     // The active peptide queue holds the candidate peptides for spectrum.
@@ -737,12 +704,13 @@ void TideSearchApplication::search(void* threadarg) {
       //TODO so this includes ALL amino acids seen (including modified, NTerm mod, CTerm Mod)
       //as a result -- we will look for NTerm mod amino acids throughout spectrum instead of
       //just amino acids without NTerm mod
+      if ( aaMassDouble.size() == 0)
+        carp(CARP_FATAL, "No amino acids were counted.\n");
+      
       vector<int> aaMassInt;
-      if (curScoreFunction != XCORR_SCORE) {
-        for (int i = 0; i < aaMassDouble.size(); i++) {
-          int tmpMass = MassConstants::mass2bin(aaMassDouble[i]);
-          aaMassInt.push_back(tmpMass);
-        }
+      for (int i = 0; i < aaMassDouble.size(); i++) {
+        int tmpMass = MassConstants::mass2bin(aaMassDouble[i]);
+        aaMassInt.push_back(tmpMass);
       }
       int maxPrecurMassBin = floor(MaxBin::Global().CacheBinEnd() + 50.0);
       double fragTol = Params::GetDouble("fragment-tolerance");
@@ -751,13 +719,8 @@ void TideSearchApplication::search(void* threadarg) {
       //TODO look at this
       int minDeltaMass;
       int maxDeltaMass;
-      if (curScoreFunction == XCORR_SCORE) {
-        minDeltaMass = aaMass[0];
-        maxDeltaMass = aaMass[nAA - 1];
-      } else {
-        minDeltaMass = aaMassInt[0];
-        maxDeltaMass = aaMassInt[nAARes - 1];
-      }
+      minDeltaMass = aaMassInt[0];
+      maxDeltaMass = aaMassInt[nAARes - 1];
 
       TideMatchSet::Arr match_arr(nCandPeptide); // scored peptides will go here.
 
@@ -885,7 +848,7 @@ void TideSearchApplication::search(void* threadarg) {
       int scoreResidueEvidence;
       int scoreRefactInt;
       vector<int> resEvScores;
-      vector<int> xcorrScores;
+      vector<int> xcorrScores; //refactored xcorr scores
       pe = 0;
       for (peidx = 0; peidx < candidatePeptideStatusSize; peidx++) {
         if ((*candidatePeptideStatus)[peidx]) {
@@ -909,7 +872,7 @@ void TideSearchApplication::search(void* threadarg) {
               scoreRefactInt += evidenceObs[pepMassIntIdx][*iter_uint];
             }
 
-            xcorrScores.push_back(scoreRefactInt);
+            xcorrScores.push_back(scoreRefactInt); //refactored xcorr scores
           }
           //END XCORR
 
@@ -949,9 +912,16 @@ void TideSearchApplication::search(void* threadarg) {
       //XCORR
       //Create a dynamic programming vector is there is a xcorr
       //and if user specified as a score function either 'xcorr' or 'both'
+
+      double bestDPPeptideTailor = -1000.0;  // Added by AKF
+      double bestDPPeptideScore = -1000.0;  // Added by AKF
+      string bestDPPeptide = "";  // Added by AKF
+      
       double* pValueDist = NULL; // Added by AKF 
       int* nRows = new int[nPepMassIntUniq];  // Added by AKF
       int max_offset = 0;   // Added by AKF for merging exact score distirbutinos
+      double dTailorQuantile = 1.0; //new double[nPepMassIntUniq]; //Added by AKF
+      
       if (curScoreFunction != RESIDUE_EVIDENCE_MATRIX) {
         int pValueDistLen = 1; // Added by AKF
         for (pe = 0; pe < nPepMassIntUniq; pe++) { // TODO should probably instead use iterator over pepMassIntUnique
@@ -980,16 +950,76 @@ void TideSearchApplication::search(void* threadarg) {
           int topRowBuffer = -minEvidence;
           int nRowDynProg = bottomRowBuffer - minScore + 1 + maxScore + topRowBuffer;
           pValueScoreObs[pe] = new double[nRowDynProg];
-          //Added by AKF
+          memset(pValueScoreObs[pe], 0.0, sizeof(double)*nRowDynProg);		  
+          
           if (nRowDynProg > pValueDistLen) {
               pValueDistLen = nRowDynProg;              
           }
           nRows[pe] = nRowDynProg; //Added by AKF          
 
-          scoreOffsetObs[pe] = calcScoreCount(maxPrecurMassBin, &evidenceObs[pe][0], pepMaInt,
-                               maxEvidence, minEvidence, maxScore, minScore,
-                               nAA, aaFreqN, aaFreqI, aaFreqC, aaMass,
-                               pValueScoreObs[pe]);
+          double pepMassDouble = ((double)pepMaInt - 0.5 + bin_offset) * bin_width;
+
+          if (bin_width > BIN_WIDTH_TH){
+            scoreOffsetObs[pe] = calcScoreCount(maxPrecurMassBin, &evidenceObs[pe][0], pepMaInt,
+                                   maxEvidence, minEvidence, maxScore, minScore,
+                                   nAARes, dAAFreqN, dAAFreqI, dAAFreqC, aaMassInt,
+                                   pValueScoreObs[pe]);
+                                    
+          } else {
+            vector< pair <int,int> > vBacktracking;
+            scoreOffsetObs[pe] = calcScoreCountHighRes(maxPrecurMassBin, &evidenceObs[pe][0], pepMaInt, pepMassDouble,
+                                   maxEvidence, minEvidence, maxScore, minScore, fragmentIonMassRoundingPrecision, bin_width, bin_offset,
+                                   nAARes, dAAFreqN, dAAFreqI, dAAFreqC, aaMassDouble, &vBacktracking,
+                                   pValueScoreObs[pe]);
+                                   
+            if (Params::GetBool("DP-peptide") && !vBacktracking.empty()){
+                
+              vector< pair <int,int> >::iterator itrBackTrack;
+//              printf("getting the DP peptide Seq\n");
+
+              // Retrieve the DP peptide sequence from the backtracking path
+              int newCol, newRow, AAEvidence, diff, tempAAMass;
+              int iMinDiff;
+              string sDPPeptide = "";
+              string tempAA;
+
+              itrBackTrack = vBacktracking.begin();     
+              int row = itrBackTrack->first;
+              int col = itrBackTrack->second;
+              double aa_mass;
+              double DPPeptideScore = ((row - scoreOffsetObs[pe]) / RESCALE_FACTOR );
+
+              if (DPPeptideScore > bestDPPeptideScore){
+                             
+                  for (++itrBackTrack; itrBackTrack != vBacktracking.end(); ++itrBackTrack){
+                    newRow = itrBackTrack->first;
+                    newCol = itrBackTrack->second;
+                    AAEvidence = col - newCol;    
+//                    printf("%d,%d, %d\n",newCol, newRow, AAEvidence);
+                    iMinDiff = maxPrecurMassBin;                    
+                    for(std::map<double, std::string>::iterator iter = mMass2AA.begin(); iter != mMass2AA.end(); ++iter) {
+                      aa_mass = iter->first;
+                      tempAAMass = floor(aa_mass/bin_width+0.5);
+                      diff = abs(AAEvidence - tempAAMass);
+                        
+                      if (diff < iMinDiff ){
+                        iMinDiff = diff;
+                        tempAA = iter->second;
+                      }
+//                      printf("in loop: %lf, %d, %d, %s, %d\n", aa_mass, tempAAMass, iMinDiff, tempAA.c_str(), diff);
+                    }
+                    sDPPeptide = tempAA + sDPPeptide;
+                    col = newCol;
+                    row = newRow;
+//                  printf("%s\n",sDPPeptide.c_str());
+                  }
+//                  printf("%s\n", sDPPeptide.c_str());
+//                  bestDPPeptideTailor = 1.0;
+                  bestDPPeptideScore = DPPeptideScore; //, DPPeptideTailor*dTailorQuantile[pe] - TAILOR_OFFSET;
+                  bestDPPeptide = sDPPeptide;
+              }           
+            }
+          }                               
         }
         // Merge separate score distirbutions. The following lines added by AKF
         for (pe = 0; pe < nPepMassIntUniq; ++pe) {
@@ -1037,7 +1067,27 @@ void TideSearchApplication::search(void* threadarg) {
           }
         }
         delete [] scoreCountBinAdjust;  
-        // Finished merging score distributions.        
+        // Finished merging score distributions. 
+        // Tailor for XPV; Added by AKF
+        if (Params::GetBool("use-tailor-calibration")){
+          vector<double> scores;
+          double quantile_th = TAILOR_QUANTILE_TH;
+          // Collect the scores for the score tail distribution
+          for (vector<int>::iterator it = xcorrScores.begin();
+            it != xcorrScores.end();
+            ++it) {
+            scores.push_back((double)((*it)/ RESCALE_FACTOR));
+          }
+          sort(scores.begin(), scores.end(), greater<double>());  //sort in decreasing order
+          int quantile_pos = (int)(quantile_th*(double)scores.size()+0.5);
+
+          if (quantile_pos < 3)
+            quantile_pos = 3;
+          if (quantile_pos >= scores.size()) 
+            quantile_pos = scores.size()-1;        
+        
+          dTailorQuantile = scores[quantile_pos]+TAILOR_OFFSET; // Make sure scores positive
+        }  //End of Tailor
       }
       //END XCORR
 
@@ -1145,7 +1195,7 @@ void TideSearchApplication::search(void* threadarg) {
           //END BOTH_SCORE
 
           if (curScoreFunction == XCORR_SCORE && pValue_xcorr == 0.0) {
-            carp(CARP_FATAL, "PSM p-value should not be equal to 0.0");
+//            carp(CARP_FATAL, "PSM p-value should not be equal to 0.0");
           } else if (curScoreFunction == RESIDUE_EVIDENCE_MATRIX && pValue_resEv == 0.0) {
             carp(CARP_FATAL, "PSM p-value should not be equal to 0.0");
           } else if (curScoreFunction == BOTH_SCORE && pValue_both == 0.0) {
@@ -1161,6 +1211,16 @@ void TideSearchApplication::search(void* threadarg) {
             curScore.resEv_pval = pValue_resEv;
             curScore.resEv_score = scoreResidueEvidence;
             curScore.combinedPval = pValue_both;
+            if (Params::GetBool("use-tailor-calibration")) {
+              curScore.tailor = (curScore.xcorr_score + TAILOR_OFFSET)/dTailorQuantile;
+              //curScore.tailor = 1.0;//pValue_refact_xcorr;
+            }            
+            if (Params::GetBool("DP-peptide")) {
+                curScore.DPPeptideScore = bestDPPeptideScore;
+                curScore.DPPeptideTailor = (bestDPPeptideScore + TAILOR_OFFSET)/dTailorQuantile;
+                curScore.DPPeptideSeq = bestDPPeptide;
+            }            
+            
             //TODO ugly hack to conform with the way these indices are generated in standard tide-search
             curScore.rank = candidatePeptideStatusSize - peidx;
             match_arr.push_back(curScore);
@@ -1256,11 +1316,6 @@ void TideSearchApplication::search(
   ofstream* target_file,
   ofstream* decoy_file,
   bool compute_sp,
-  int nAA,
-  double* aaFreqN,
-  double* aaFreqI,
-  double* aaFreqC,
-  int* aaMass,
   int nAARes,
   const vector<double>& dAAFreqN,
   const vector<double>& dAAFreqI,
@@ -1321,7 +1376,7 @@ void TideSearchApplication::search(
       proteins, locations, precursor_window, window_type, spectrum_min_mz,
       spectrum_max_mz, min_scan, max_scan, min_peaks, search_charge, top_matches,
       highest_mz, target_file, decoy_file, compute_sp,
-      i, NUM_THREADS, nAA, aaFreqN, aaFreqI, aaFreqC, aaMass,
+      i, NUM_THREADS, 
       nAARes, &dAAFreqN, &dAAFreqI, &dAAFreqC, &dAAMass,
       &mod_table, &nterm_mod_table, &cterm_mod_table, numDecoys, locks_array, //TODO do I need to delete pointer somewhere?
       bin_width_, bin_offset_, exact_pval_search_, spectrum_flag_, sc_index, total_candidate_peptides, negative_isotope_errors));
@@ -1707,11 +1762,13 @@ vector<string> TideSearchApplication::getOptions() const {
     "store-spectra",
     "top-match",
     "txt-output",
+    "xpv-precision",  // Added by AKF    
     "brief-output",
     "use-flanking-peaks",
     "use-neutral-loss-peaks",
     "use-z-line",
-    "use-tailor-calibration",    
+    "use-tailor-calibration",  
+    "DP-peptide",    	    
     "verbosity"
   };
   return vector<string>(arr, arr + sizeof(arr) / sizeof(string));
@@ -1763,10 +1820,10 @@ int TideSearchApplication::calcScoreCount(
   int maxScore,
   int minScore,
   int nAA,
-  double* aaFreqN,
-  double* aaFreqI,
-  double* aaFreqC,
-  int* aaMass,
+  const vector<double>& aaFreqN,
+  const vector<double>& aaFreqI,
+  const vector<double>& aaFreqC,
+  const vector<int>& aaMass,
   double* pValueScoreObs
 ) {
   const int nDeltaMass = nAA;
@@ -1864,6 +1921,428 @@ int TideSearchApplication::calcScoreCount(
 
   return scoreOffsetObs;
 }
+
+ int TideSearchApplication::calcScoreCountHighRes(
+    int numelEvidenceObs,
+    int* evidenceObs,
+    int pepMassInt,
+    double pepMassDouble,    
+    int maxEvidence,
+    int minEvidence,
+    int maxScore,
+    int minScore,
+    double precision,
+    double bin_width,
+    double bin_offset,    
+    int nAA,
+    const vector<double>& aaFreqN,
+    const vector<double>& aaFreqI,
+    const vector<double>& aaFreqC,
+    const vector<double>& aaMass,
+    vector< pair <int,int> >* vBacktracking,
+    double* pValueScoreObs
+  ){
+  const int nDeltaMass = nAA;
+  int minDeltaMass = MassConstants::mass2bin(aaMass[0]);
+  int maxDeltaMass = MassConstants::mass2bin(aaMass[nDeltaMass - 1]);
+
+  // internal variables
+  int row;
+  int col;
+  int ma;
+  int evidence;
+  int de;
+  int evidenceRow;
+  double sumScore;
+
+  int bottomRowBuffer = maxEvidence + 1;
+  int topRowBuffer = -minEvidence;
+  int colBuffer = maxDeltaMass;
+  int colStart = MassConstants::mass2bin(MASS_PROTON);
+  int scoreOffsetObs = bottomRowBuffer - minScore;
+
+  int nRow = bottomRowBuffer - minScore + 1 + maxScore + topRowBuffer;
+  int nCol = colBuffer + pepMassInt + 1000;
+  int rowFirst = bottomRowBuffer;
+  int rowLast = rowFirst - minScore + maxScore;
+  int colFirst = colStart + MassConstants::mass2bin(MASS_PROTON);
+  int colLast = MassConstants::mass2bin(pepMassDouble - MassConstants::mono_oh);
+  int initCountRow = bottomRowBuffer - minScore;
+  int initCountCol = maxDeltaMass + colStart;
+
+  std::vector<int>* rowIdx = new std::vector<int> [nCol];
+  std::vector<int>::iterator rowIt;
+  
+  double** dynProgArray = new double*[nCol];
+  for (col = 0; col < colFirst+maxDeltaMass; col++) {
+  // for (col = 0; col < nCol; col++) {
+    dynProgArray[col] = new double[nRow];
+    memset(dynProgArray[col], 0.0, nRow*sizeof(double));
+  }
+  
+/*  double** dynProgArray = new double*[nRow];
+
+
+
+
+
+
+
+
+
+
+  for (row = 0; row < nRow; row++) {
+    dynProgArray[row] = new double[nCol];
+    for (col = 0; col < nCol; col++) {
+      dynProgArray[row][col] = 0.0;
+    }
+  }
+  */
+  std::set<double>::iterator it;
+  
+  double* scoreCountBinAdjust = 0;
+  scoreCountBinAdjust = new double[nRow];
+  memset(scoreCountBinAdjust, 0.0, nRow*sizeof(double));
+
+  unsigned int i;
+
+  unsigned int aa;  // an iterator for the amino acid masses
+  unsigned int newCol; // a variable for the columns in the dynaim programming tables
+  unsigned int newRow; // variable for the new row after
+  dynProgArray[colStart][initCountRow] = 1.0; // initial count of peptides with mass = 1   // Modified by AKF
+  
+  
+  double cellSize;
+  double precisionInv = 1.0/precision;
+  double bin_width_inv = 1.0/bin_width;
+  bin_offset = 1-bin_offset;
+  unsigned int* mass_offset = new unsigned int[nCol];
+  for(col = 0; col < nCol; ++col){
+    mass_offset[col] = col*precisionInv;
+  }
+  int residueNum = precisionInv + 2.0;
+  
+  int*** residueArray = new int**[nCol]; 
+  for (col = 0; col < colFirst+maxDeltaMass; col++) {
+  // for (col = 0; col < nCol; col++) {
+    residueArray[col] = new int*[nRow];
+    memset(residueArray[col], 0, sizeof(int*)*nRow);
+  }
+  
+/*  for (col = 0; row < nRow; ++row){
+      residueArray[row] = new int*[nCol];
+      for (col = 0; col < nCol; ++col){
+        residueArray[row][col] = NULL; //new int[residueNum];
+//      memset(residueArray[row][col], 0, sizeof(int)*residueNum);
+    }
+  }
+  */
+  int** iBackTractCol = new int*[nCol];
+  int** iBackTractRow = new int*[nCol];
+  for (col = 0; col < nCol; ++col) {
+    iBackTractCol[col] = new int[nRow];
+    iBackTractRow[col] = new int[nRow];
+    memset(iBackTractCol[col], 0, sizeof(int)*nRow);
+    memset(iBackTractRow[col], 0, sizeof(int)*nRow);
+  }  
+
+  double newMass;  
+  int remaining;
+  int res;
+  int residueCnt;
+  
+  unsigned int nTermResidue = MASS_PROTON*precisionInv*bin_width_inv;// MassConstants::mono_h*precisionInv*bin_width_inv;  
+  /*
+ 
+  std::vector<double> testMasses;
+  
+  // Peptide: "LVKRVK"
+  testMasses.push_back(113.084064015); // I L
+  testMasses.push_back(99.068413945); // V
+  testMasses.push_back(128.094963050+ 229.16293); // K
+  testMasses.push_back(156.101111050); // R  
+  testMasses.push_back(99.068413945); // V
+  testMasses.push_back(128.094963050 + 229.16293); // K
+
+  testMasses.push_back(87.032028435); // S
+  testMasses.push_back(57.021463735); // G
+  testMasses.push_back(87.032028435); // S
+  testMasses.push_back(114.042927470); // N
+  testMasses.push_back(101.047678505); // T
+  testMasses.push_back(163.063328575); // Y
+  testMasses.push_back(115.026943065); // D
+  testMasses.push_back(115.026943065); // D
+  testMasses.push_back(113.084064015); // I L
+  testMasses.push_back(71.037113805); // A
+  testMasses.push_back(57.021463735); // G
+  testMasses.push_back(71.037113805); // A
+  testMasses.push_back(115.026943065); // D
+  testMasses.push_back(99.068413945); // V
+  testMasses.push_back(99.068413945); // V
+  testMasses.push_back(113.084064015); // I L
+  testMasses.push_back(99.068413945); // V
+  testMasses.push_back(101.047678505); // T
+  testMasses.push_back(71.037113805); // A
+  testMasses.push_back(57.021463735); // G
+  testMasses.push_back(147.068413945); // F
+  testMasses.push_back(101.047678505); // T
+  testMasses.push_back(128.094963050 + 229.16293); // K
+  
+  
+  
+  testMasses.push_back(57.021463735); // G
+  testMasses.push_back(71.037113805); // A
+  testMasses.push_back(87.032028435); // S
+  testMasses.push_back(97.052763875); // P
+  testMasses.push_back(99.068413945); // V
+  testMasses.push_back(101.047678505); // T
+  testMasses.push_back(103.009184505+57.021464); // C
+  testMasses.push_back(113.084064015); // I L
+  testMasses.push_back(114.042927470); // N
+  testMasses.push_back(115.026943065); // D
+  testMasses.push_back(128.058577540); // Q
+  testMasses.push_back(128.094963050 + 229.16293); // K
+  testMasses.push_back(129.042593135); // E
+  testMasses.push_back(131.040484645); // M
+  testMasses.push_back(137.058911875); // H
+  testMasses.push_back(147.068413945); // F
+  testMasses.push_back(150.953633405); // U
+  testMasses.push_back(156.101111050); // R
+  testMasses.push_back(163.063328575); // Y
+  testMasses.push_back(186.079312980); // W
+  testMasses.push_back(237.147726925); // O
+
+  std::vector<double> origMasses;
+  testMasses[0] += 229.16293;  // Add N-terminal residue 
+  double offset = 0.5;
+  
+  nAA = testMasses.size();
+  for (aa = 0; aa < nAA; ++aa){
+      origMasses.push_back(testMasses[aa]);
+      testMasses[aa] = floor(testMasses[aa]*precisionInv*bin_width_inv+offset);
+      
+  }
+
+  double fragment_mass = MASS_PROTON;
+  double nterm_proton = floor(MASS_PROTON*bin_width_inv*precisionInv+offset);
+  int expected_bin;
+  int expected_res;
+  vector<int> cols;
+//  bin_offset = 0;
+  row = initCountRow;
+  col = colStart;   // floor(MASS_PROTON*bin_width_inf+bin_offset)
+  remaining = ((nterm_proton*precision+bin_offset))*precisionInv - ((double)col+ bin_offset)*precisionInv;
+  
+  printf("bin_width: %lf, bin_w_inv:%lf, bin_offset:%lf  prec:%lf, precInv:%lf \n",bin_width, bin_width_inv,bin_offset, precision, precisionInv);
+  printf("colstart: %d, proton mass:%lf, first:%lf, second:%lf, rem:%d\n", colStart, MASS_PROTON, ((nterm_proton*precision+bin_offset))*precisionInv, ((double)col+ bin_offset)*precisionInv, remaining);
+  
+  for (aa=0; aa<nAA; ++aa){
+
+    newMass = remaining + testMasses[aa] + ((double)col-bin_offset)*precisionInv;
+    newCol = (int)(newMass * precision + bin_offset);    //   mass/bin_width_ + bin_offset_
+    newRow = row + evidenceObs[newCol];
+    remaining = newMass - ((int)(newCol+bin_offset) )*precisionInv;
+      
+    fragment_mass += origMasses[aa];
+    expected_bin = (int)(fragment_mass*bin_width_inv + bin_offset);
+    expected_res = floor((fragment_mass*bin_width_inv)*precisionInv) - (int)(expected_bin+bin_offset)*precisionInv;
+    
+    printf("%d\t%d\t%lf\t%lf\t%lf\t%d\t%d\t%d\t%d\t%lf\t%d\t%d\t%d\n", col, row, testMasses[aa], origMasses[aa], newMass,  newCol, newRow, evidenceObs[newCol], remaining,  fragment_mass, expected_bin, evidenceObs[expected_bin], expected_res);
+//    printf("%lf\t%lf\t%d\t%d\t%d\t%d\t%d\t%d\t%lf\t%lf\t%d\n", testMasses[aa], newMass, newCol, newRow, remaining, expected_bin, evidenceObs[newCol], evidenceObs[expected_bin], origMasses[aa], fragment_mass, expected_res);
+    row = newRow;
+    col = newCol;
+    cols.push_back(newCol);
+  }
+//  exit(0);
+*/
+  // Handle the N-terminal side
+  vector<double> vFreq;
+  vector<double> vFreqC;
+  vector<double> vMass;
+  
+  for (i = 0; i < aaFreqN.size(); ++i){
+    if (aaFreqN[i] > 0.0){
+      vFreq.push_back(aaFreqN[i]);
+      vMass.push_back(aaMass[i]*precisionInv*bin_width_inv+0.5);
+    }
+  }
+
+
+  nAA = vFreq.size();
+  for (aa = 0; aa < nAA; aa++) {
+
+    newMass = floor(nTermResidue + vMass[aa]);    
+    newCol = (int)(newMass * precision + bin_offset);    //mass/bin_width_ + bin_offset_
+    newRow = initCountRow + evidenceObs[newCol];
+    if (newCol <= colLast) {
+      if (dynProgArray[newCol][newRow] == 0.0){     
+        rowIdx[newCol].push_back(newRow);
+        residueArray[newCol][newRow] = new int[residueNum];
+        memset(residueArray[newCol][newRow], 0, sizeof(int)*residueNum);
+      }
+      dynProgArray[newCol][newRow] += dynProgArray[colStart][initCountRow] * vFreq[aa];
+      iBackTractCol[newCol][newRow] = colStart;
+      iBackTractRow[newCol][newRow] = initCountRow;
+      
+      remaining = newMass - (int)((newCol-bin_offset)*precisionInv); //mass_offset[newCol];
+      residueArray[newCol][newRow][remaining] = 1;   
+    }
+  } 
+  for (col = 0; col < colFirst; ++col ){
+    delete [] dynProgArray[col];
+    delete [] residueArray[col];
+  }
+
+  // Handle the non-terminal amino acids
+  vFreq.clear();
+  vMass.clear(); 
+  vFreqC.clear();  
+  for (i = 0; i < aaMass.size(); ++i){
+    if (aaFreqI[i] > 0.0 || aaFreqC[i] > 0.0){
+      vFreq.push_back(aaFreqI[i]);
+      vFreqC.push_back(aaFreqC[i]);
+      vMass.push_back(floor(aaMass[i]*precisionInv*bin_width_inv+0.5));
+    }
+  }
+  nAA = vMass.size();
+  int null_cnt = 0;
+  for (col = colFirst; col < colLast; ++col) {
+    dynProgArray[col+maxDeltaMass ] = new double[nRow];
+    memset(dynProgArray[col+maxDeltaMass],0.0, nRow*sizeof(double));
+    residueArray[col+maxDeltaMass] = new int*[nRow];
+    memset(residueArray[col+maxDeltaMass], 0, nRow*sizeof(int*));
+      
+    // for (rowIt = rowIdx[col].begin(); rowIt != rowIdx[col].end(); ++rowIt){ 
+   for (row = 0; row < nRow; ++row){ 
+      // row = *rowIt;  
+      if (dynProgArray[col][row] == 0.0){
+        ++null_cnt;
+        continue;
+      }
+      residueCnt = 0;
+
+      for (res = 0; res < residueNum; ++res)
+        if (residueArray[col][row][res] == 1)
+          ++residueCnt;
+      
+      cellSize = 1.0/(double)residueCnt;
+      for (res = 0; res < residueNum; ++res){
+        if (residueArray[col][row][res] == 0)
+          continue;
+        for (aa = 0; aa < nAA; ++aa) {
+          newMass = res + vMass[aa] + (col-bin_offset)*precisionInv;    
+          newCol = (int)(newMass * precision + bin_offset); 
+          
+          if (newCol < colLast && vFreq[aa] > 0.0){
+            evidenceRow = row + evidenceObs[newCol];
+            if (dynProgArray[newCol][evidenceRow] == 0.0){
+              // rowIdx[newCol].push_back(evidenceRow);
+              residueArray[newCol][evidenceRow] = new int[residueNum];
+              memset(residueArray[newCol][evidenceRow], 0, sizeof(int)*residueNum);
+            }
+            dynProgArray[newCol][evidenceRow] += dynProgArray[col][row]*vFreq[aa]*cellSize; 
+            
+            remaining = newMass - (int)((newCol-bin_offset)*precisionInv);
+            residueArray[newCol][evidenceRow][remaining] = 1;   
+          }
+          if (newCol == colLast && vFreqC[aa] > 0.0){
+            evidenceRow = row;           
+            dynProgArray[newCol][evidenceRow] += dynProgArray[col][row]*vFreqC[aa]*cellSize; 
+          }     
+          if (iBackTractCol[newCol][evidenceRow] == 0){
+            iBackTractCol[newCol][evidenceRow] = col;
+            iBackTractRow[newCol][evidenceRow] = row;    
+          }          
+        }
+      }
+      if (residueArray[col][row] != NULL ) {
+        delete [] residueArray[col][row];
+        residueArray[col][row] = NULL;  
+      }
+    }
+    // rowIdx[col].clear();
+    delete [] dynProgArray[col];
+    delete [] residueArray[col];
+  }
+  printf("nCol, %d, nRow %d, nullcnt %d\n", nCol, nRow, null_cnt);
+  int colScoreCount = colLast; // Modified by AKF
+  //Till this part was added by AKF  
+//  printf("col last:\t%d\n", colLast);
+//  printf("scoreOffsetObs:\t%d\n", scoreOffsetObs);
+ 
+  double totalCount = 0.0;
+  for (row = 0; row < nRow; row++) {
+    // at this point pValueScoreObs just holds counts from last column of dynamic programming array
+    pValueScoreObs[row] = dynProgArray[colScoreCount][row];
+//    totalCount += pValueScoreObs[row];
+//    scoreCountBinAdjust[row] = pValueScoreObs[row] / 2.0;
+  }
+  //Handle empty score distributions. Added by AKF
+/*  if (totalCount == 0.0) {
+    totalCount = 1.0;
+     pValueScoreObs[nRow-1] = 1.0;
+  }
+  
+  // convert from counts to cumulative sum of counts
+  for (row = nRow - 2; row >= 0; row--) {
+    pValueScoreObs[row] += pValueScoreObs[row + 1];
+  }
+  
+  double logTotalCount = log(totalCount);
+  for (row = 0; row < nRow; row++) {
+    // adjust counts to reflect center of bin, not edge
+    pValueScoreObs[row] -= scoreCountBinAdjust[row];
+    // normalize distribution; use exp( log ) to avoid potential underflow    
+    // Removed by AKF. This should be normalized after merging the distributions:
+    // pValueScoreObs[row] = exp(log(pValueScoreObs[row]) - logTotalCount);
+  }
+  */
+  //Back-tracking to extract the top-scoring peptide sequence from the DP table. 
+  for (row = nRow-1; row >= 0; --row) {
+    if (dynProgArray[colScoreCount][row] > 0.0)
+      break;
+  }  
+  if (row >= 0) {
+    col = colScoreCount;
+    vBacktracking->clear();
+  
+    while (col > colStart){
+      vBacktracking->push_back(make_pair(row, col));
+//      printf("%d,\t%d\n", row,col);
+      newCol = iBackTractCol[col][row];
+      newRow = iBackTractRow[col][row];
+      col = newCol;
+      row = newRow;
+    }
+    vBacktracking->push_back(make_pair(row, col));
+  }
+
+  // clean up
+  for (col = colLast; col < colLast+maxDeltaMass; ++col) {
+    for (row = 0; row < nRow; ++row) {
+      if (residueArray[col][row] != NULL) {
+        delete [] residueArray[col][row];  
+      }
+    }
+    delete [] dynProgArray[col];    
+    delete [] residueArray[col];  
+  }
+  for (col = 0; col < nCol; ++col){
+    delete [] iBackTractCol[col];
+    delete [] iBackTractRow[col];
+  }
+    
+  delete [] dynProgArray;
+  delete [] iBackTractCol;
+  delete [] iBackTractRow;
+  delete [] residueArray;
+  delete [] scoreCountBinAdjust;
+  delete [] rowIdx;
+  delete [] mass_offset;
+
+  return scoreOffsetObs;
+
+} 
 
 /*
  * Calculates counts of peptides with various residue evidence scores, given

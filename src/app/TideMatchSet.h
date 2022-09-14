@@ -41,6 +41,9 @@ class TideMatchSet {
     double combinedPval;
     int rank;
     double tailor;  //Added by AKF    
+    double DPPeptideScore; //Added by AKF for extracting the best scoring peptide from the DP table;
+    double DPPeptideTailor; //Added by AKF for extracting the best scoring peptide from the DP table;
+    string DPPeptideSeq; //Added by AKF for extracting the best scoring peptide from the DP table;
 
     /*// added by Yang
     double prec_intensity_logrank;

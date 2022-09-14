@@ -289,6 +289,123 @@ int ActivePeptideQueue::SetActiveRangeBIons(vector<double>* min_mass, vector<dou
 }
 
 int ActivePeptideQueue::CountAAFrequency(
+  vector<double>& dAAFreqN,
+  vector<double>& dAAFreqI,
+  vector<double>& dAAFreqC,
+  vector<double>& dAAMass,
+  map<double, std::string>& mMass2AA  
+  ) {
+	unsigned int len;
+    unsigned int i;
+    unsigned int cntTerm = 0;
+    unsigned int cntInside = 0;
+	unsigned int first_loc_protein_id;
+	unsigned int first_loc_pos;
+	unsigned int protein_length;
+	char residue;
+	const char* peptide_seq;
+	vector<unsigned int> residue_masses;
+	vector<double> residue_mods;
+	string tempAA;
+	int mod_precision  = Params::GetInt("mod-precision");
+    const unsigned int MaxModifiedAAMassBin = MassConstants::ToFixPt(2000.0);;   //2000 is the maximum size of a modified amino acid
+    unsigned int* nvAAMassCounterN = new unsigned int[MaxModifiedAAMassBin];   //N-terminal amino acids
+    unsigned int* nvAAMassCounterC = new unsigned int[MaxModifiedAAMassBin];   //C-terminal amino acids
+    unsigned int* nvAAMassCounterI = new unsigned int[MaxModifiedAAMassBin];   //inner amino acids in the peptides
+    memset(nvAAMassCounterN, 0, MaxModifiedAAMassBin * sizeof(unsigned int));
+    memset(nvAAMassCounterC, 0, MaxModifiedAAMassBin * sizeof(unsigned int));
+    memset(nvAAMassCounterI, 0, MaxModifiedAAMassBin * sizeof(unsigned int));
+	
+	  
+    while (!(reader_->Done())) { // read all peptides in index
+      reader_->Read(&current_pb_peptide_);
+	  len = current_pb_peptide_.length();
+      first_loc_protein_id = current_pb_peptide_.first_location().protein_id(),
+      first_loc_pos = current_pb_peptide_.first_location().pos(),	  
+      peptide_seq = proteins_[first_loc_protein_id]->residues().data() + first_loc_pos;
+	  protein_length = proteins_[first_loc_protein_id]->residues().length();
+	  
+	  residue_masses.clear();
+	  residue_masses.reserve(len);
+	  residue_mods.clear();
+	  residue_mods.reserve(len);
+	  
+	  for (i = 0; i < len; ++i) {  // Go over the residues of the peptide.
+	    residue = peptide_seq[i];
+		if (i == 0) {  // nterm static modifications
+          if (first_loc_pos == 0)
+            residue_masses[i] = MassConstants::fixp_nprotterm_mono_table[residue];
+		  else
+			residue_masses[i] = MassConstants::fixp_nterm_mono_table[residue];  
+		} else if (i == len - 1) {  // cterm static modifications
+		  if(first_loc_pos + len == protein_length - 1)
+			residue_masses[i] = MassConstants::fixp_cprotterm_mono_table[residue];
+		  else
+			residue_masses[i] = MassConstants::fixp_cterm_mono_table[residue];
+		} else { //all other static modifications if any
+			residue_masses[i] = MassConstants::fixp_mono_table[residue];
+		}
+		residue_mods[i] = 0.0;
+	  }
+	  // Add variable modifications
+	  for (i = 0; i < current_pb_peptide_.modifications_size(); ++i) {
+		int index;
+		double delta;
+		MassConstants::DecodeMod(current_pb_peptide_.modifications(i), &index, &delta);
+		residue_masses[index] += MassConstants::ToFixPt(delta);
+		residue_mods[index] = delta;
+	  }
+	  
+	  // count AA masses
+      ++nvAAMassCounterN[residue_masses[0]];  // N-temrianl
+	  if (nvAAMassCounterN[residue_masses[0]] == 1){
+		  tempAA = string(peptide_seq, 1);
+		  if (residue_mods[0] != 0) {
+			  tempAA += "[" + StringUtils::ToString(residue_mods[0], mod_precision) + ']';
+		  }
+		  mMass2AA[MassConstants::ToDouble(residue_masses[0])] = tempAA;
+	  }
+      for (i = 1; i < len-1; ++i) {
+        ++nvAAMassCounterI[residue_masses[i]];  // non-terminal
+		if (nvAAMassCounterI[residue_masses[i]] == 1){
+			tempAA = string(&peptide_seq[i], 1);
+			if (residue_mods[i] != 0) {
+			  tempAA += "[" + StringUtils::ToString(residue_mods[i], mod_precision) + ']';
+			}
+			mMass2AA[MassConstants::ToDouble(residue_masses[i])] = tempAA;
+		}		
+        ++cntInside;
+      }
+      ++nvAAMassCounterC[residue_masses[len - 1]];  // C-temrinal
+	  if (nvAAMassCounterC[residue_masses[len - 1]] == 1){
+		  tempAA = string(peptide_seq, 1);
+		  if (residue_mods[len - 1] != 0) {
+			  tempAA += "[" + StringUtils::ToString(residue_mods[len - 1], mod_precision) + ']';
+		  }
+		  mMass2AA[MassConstants::ToDouble(residue_masses[len - 1])] = tempAA;
+	  }
+      ++cntTerm;
+
+    }
+	
+    unsigned int uiUniqueMasses = 0;
+    for (i = 0; i < MaxModifiedAAMassBin; ++i) {
+      if (nvAAMassCounterN[i] || nvAAMassCounterI[i] || nvAAMassCounterC[i]) {
+        ++uiUniqueMasses;
+        dAAMass.push_back(MassConstants::ToDouble(i));
+        dAAFreqN.push_back((double)nvAAMassCounterN[i] / cntTerm);
+        dAAFreqI.push_back((double)nvAAMassCounterI[i] / cntInside);
+        dAAFreqC.push_back((double)nvAAMassCounterC[i] / cntTerm);
+      }
+    }
+   delete[] nvAAMassCounterN;
+   delete[] nvAAMassCounterI;
+   delete[] nvAAMassCounterC;
+   return uiUniqueMasses;
+  
+  }
+
+int ActivePeptideQueue::CountAAFrequency(
   double binWidth,
   double binOffset,
   double** dAAFreqN,
@@ -300,7 +417,7 @@ int ActivePeptideQueue::CountAAFrequency(
     unsigned int i = 0;
     unsigned int cntTerm = 0;
     unsigned int cntInside = 0;
-    const unsigned int MaxModifiedAAMassBin = 2000 / binWidth;   //2000 is the maximum size of a modified amino acid
+    const unsigned int MaxModifiedAAMassBin = MassConstants::ToFixPt(2000.0);   //2000 is the maximum size of a modified amino acid
     unsigned int* nvAAMassCounterN = new unsigned int[MaxModifiedAAMassBin];   //N-terminal amino acids
     unsigned int* nvAAMassCounterC = new unsigned int[MaxModifiedAAMassBin];   //C-terminal amino acids
     unsigned int* nvAAMassCounterI = new unsigned int[MaxModifiedAAMassBin];   //inner amino acids in the peptides
@@ -310,8 +427,10 @@ int ActivePeptideQueue::CountAAFrequency(
 
     while (!(reader_->Done())) { // read all peptides in index
       reader_->Read(&current_pb_peptide_);
-//      Peptide* peptide = new(&fifo_alloc_peptides_) Peptide(current_pb_peptide_, proteins_, &fifo_alloc_peptides_);
-      Peptide* peptide = new Peptide(current_pb_peptide_, proteins_, NULL);              
+	  
+	  
+	  
+      Peptide* peptide = new(&fifo_alloc_peptides_) Peptide(current_pb_peptide_, proteins_, &fifo_alloc_peptides_);
 
       vector<double> dAAResidueMass = peptide->getAAMasses(); //retrieves the amino acid masses, modifications included
 
@@ -324,9 +443,9 @@ int ActivePeptideQueue::CountAAFrequency(
       ++nvAAMassCounterC[(unsigned int)(dAAResidueMass[nLen - 1] / binWidth + 1.0 - binOffset)];
       ++cntTerm;
 
-      // fifo_alloc_peptides_.ReleaseAll();
-      delete peptide;
+      fifo_alloc_peptides_.ReleaseAll();
     }
+
   //calculate the unique masses
   unsigned int uiUniqueMasses = 0;
   for (i = 0; i < MaxModifiedAAMassBin; ++i) {
@@ -368,7 +487,8 @@ int ActivePeptideQueue::CountAAFrequencyRes(
   vector<double>& dAAFreqN,
   vector<double>& dAAFreqI,
   vector<double>& dAAFreqC,
-  vector<double>& dAAMass
+  vector<double>& dAAMass,
+  map<double, std::string>& mMass2AA  
 ) {
   unsigned int i = 0;
   unsigned int cntTerm = 0; //counter for terminal residues
@@ -380,8 +500,8 @@ int ActivePeptideQueue::CountAAFrequencyRes(
 
   while (!(reader_->Done())) { //read all peptides in index
     reader_->Read(&current_pb_peptide_);
-    //Peptide* peptide = new(&fifo_alloc_peptides_) Peptide(current_pb_peptide_, proteins_, &fifo_alloc_peptides_);
-    Peptide* peptide = new Peptide(current_pb_peptide_, proteins_, NULL);        
+    Peptide* peptide = new(&fifo_alloc_peptides_) Peptide(current_pb_peptide_, proteins_, &fifo_alloc_peptides_);
+
     vector<double> dAAResidueMass = peptide->getAAMasses(); //retrieves the amino acid massses, modifications included
 
     int nLen = peptide->Len(); //peptide length
@@ -417,10 +537,30 @@ int ActivePeptideQueue::CountAAFrequencyRes(
         allMap[dAAResidueMass[i]] = 1;
       }
     }
+    // Added by AKF
+    // Create a map from the masses to the Amino acids symbols
+    string sPeptideSeq = peptide->SeqWithMods();
+    int nPeptideLen = sPeptideSeq.length();
+    //printf("peptideSeq: %s,\t%d,\t%d\n", sPeptideSeq.c_str(), nPeptideLen, nLen);
+
+    string tempAA;
+    int c;
+    for(i = 0, c = 0; i < nLen; ++c, ++i) {
+      if (mMass2AA.count(dAAResidueMass[i]) == 0) {
+        tempAA = sPeptideSeq[c];
+        if (i < (nPeptideLen-1) && sPeptideSeq[c+1] == '['){
+          do {
+            ++c;            
+            tempAA += sPeptideSeq[c];
+          } while (sPeptideSeq[c] != ']');
+        }     
+        mMass2AA[dAAResidueMass[i]] = tempAA;
+//        printf("%s\n", tempAA.c_str());
+      }
+    }
 
     //release memory
-    // fifo_alloc_peptides_.ReleaseAll();
-    delete peptide;
+    fifo_alloc_peptides_.ReleaseAll();
   }
 
   //determine the unique masses for all residues
@@ -436,7 +576,6 @@ int ActivePeptideQueue::CountAAFrequencyRes(
 
   return dAAMass.size();
 }
-
 
 void ActivePeptideQueue::ReportPeptideHits(Peptide* peptide) {
     if (!peptide_centric_) {

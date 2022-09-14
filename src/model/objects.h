@@ -477,6 +477,10 @@ enum _scorer_type {
 
   BOTH_PVALUE, //combined res-ev pvalue and xcorr pvalue. added by Andy Lin
   TAILOR_SCORE,  //Added for tailor score calibration method by AKF
+  DP_PEPT_SCORE,  //Added for best scoring peptide from DP by AKF
+  DP_PEPT_TAILOR,  //Added for best scoring peptide from DP by AKF
+  
+  
 
   // DIAmeter-related scores, added by Yang
   PRECURSOR_INTENSITY_RANK_M0,
