@@ -550,7 +550,7 @@ void TideSearchApplication::search(void* threadarg) {
   // cycle through spectrum-charge pairs, sorted by neutral mass
   FLOAT_T sc_total = (FLOAT_T)spec_charges->size();
   int print_interval = Params::GetInt("print-search-progress");
-  double fragmentIonMassRoundingPrecision = Params::GetDouble("xpv-precision"); //   0.02;
+  double fragmentIonMassRoundingPrecision = 1./Params::GetDouble("xpv-precision"); //   0.02;
 
   for (vector<SpectrumCollection::SpecCharge>::const_iterator sc = spec_charges->begin()+thread_num;
        sc < spec_charges->begin() + (spec_charges->size());
@@ -2216,7 +2216,7 @@ int TideSearchApplication::calcScoreCount(
    for (row = 0; row < nRow; ++row){ 
       // row = *rowIt;  
       if (dynProgArray[col][row] == 0.0){
-        ++null_cnt;
+//        ++null_cnt;
         continue;
       }
       residueCnt = 0;
@@ -2264,7 +2264,7 @@ int TideSearchApplication::calcScoreCount(
     delete [] dynProgArray[col];
     delete [] residueArray[col];
   }
-  printf("nCol, %d, nRow %d, nullcnt %d\n", nCol, nRow, null_cnt);
+  // printf("nCol, %d, nRow %d, nullcnt %d\n", nCol, nRow, null_cnt);
   int colScoreCount = colLast; // Modified by AKF
   //Till this part was added by AKF  
 //  printf("col last:\t%d\n", colLast);

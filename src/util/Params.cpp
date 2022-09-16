@@ -784,7 +784,7 @@ Params::Params() : finalized_(false) {
     "Applyies the cross-correlation penalty for XCorr[[html: as described in "
     "<a href=\"\">TBA</a>]].",
     "Available for tide-search", true);     
-  InitDoubleParam("xpv-precision", 0.1, 0.001, 1,
+  InitDoubleParam("xpv-precision", 20, 1, 1000,
     "Determines the precision on the exact p value caculation for high resolution MS2 data. ",
     "Available for tide-search", true);         	    
   InitDoubleParam("max-spectrum_neutral-mass", 10000000, 0, 10000000,
