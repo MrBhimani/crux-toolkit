@@ -550,7 +550,7 @@ void TideSearchApplication::search(void* threadarg) {
   // cycle through spectrum-charge pairs, sorted by neutral mass
   FLOAT_T sc_total = (FLOAT_T)spec_charges->size();
   int print_interval = Params::GetInt("print-search-progress");
-  double fragmentIonMassRoundingPrecision = 1./Params::GetDouble("xpv-precision"); //   0.02;
+  double fragmentIonMassRoundingPrecision = 1.0/Params::GetDouble("xpv-precision"); //   0.02;
 
   for (vector<SpectrumCollection::SpecCharge>::const_iterator sc = spec_charges->begin()+thread_num;
        sc < spec_charges->begin() + (spec_charges->size());
@@ -2212,9 +2212,9 @@ int TideSearchApplication::calcScoreCount(
     residueArray[col+maxDeltaMass] = new int*[nRow];
     memset(residueArray[col+maxDeltaMass], 0, nRow*sizeof(int*));
       
-    // for (rowIt = rowIdx[col].begin(); rowIt != rowIdx[col].end(); ++rowIt){ 
-   for (row = 0; row < nRow; ++row){ 
-      // row = *rowIt;  
+    for (rowIt = rowIdx[col].begin(); rowIt != rowIdx[col].end(); ++rowIt){ 
+//   for (row = 0; row < nRow; ++row){ 
+      row = *rowIt;  
       if (dynProgArray[col][row] == 0.0){
 //        ++null_cnt;
         continue;
@@ -2236,7 +2236,7 @@ int TideSearchApplication::calcScoreCount(
           if (newCol < colLast && vFreq[aa] > 0.0){
             evidenceRow = row + evidenceObs[newCol];
             if (dynProgArray[newCol][evidenceRow] == 0.0){
-              // rowIdx[newCol].push_back(evidenceRow);
+              rowIdx[newCol].push_back(evidenceRow);
               residueArray[newCol][evidenceRow] = new int[residueNum];
               memset(residueArray[newCol][evidenceRow], 0, sizeof(int)*residueNum);
             }
@@ -2260,7 +2260,7 @@ int TideSearchApplication::calcScoreCount(
         residueArray[col][row] = NULL;  
       }
     }
-    // rowIdx[col].clear();
+    rowIdx[col].clear();
     delete [] dynProgArray[col];
     delete [] residueArray[col];
   }
