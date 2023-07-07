@@ -12,17 +12,18 @@ than 1.0, then Tide executes the original, standard XPV algorithm
 (doi: https://doi.org/10.1074/mcp.o113.036327) developed for low-resolution 
 MS/MS data. We also note that Tide supports multi threading, so 
 HR-XPV can also be run with multi threads by specifying the --num-threads
-parameter bigger than 1. We also note that the HR-XPV is not 
-supported in combination with the Res-EV scoring method 
-(doi: https://doi.org/10.1021/acs.jproteome.8b00206) now. 
-The precision of the HR-XPV method can be specified with the 
-tide-search parameter called --xpv-precision. By default, this 
-value is set to 20.
+parameter bigger than 1. We also note that the HR-XPV is not supported 
+in combination with the Res-EV scoring method 
+(doi: https://doi.org/10.1021/acs.jproteome.8b00206) now. The precision 
+of the HR-XPV method can be specified with the tide-search parameter 
+called --xpv-precision. By default, this parameter is set to 20.
 
 Basically you can activate the HR-XPV by adding the following parameters 
 to the command: 
 
---exact-p-value T --mz-bin-width 0.05 --mz-bin-offset 0.0 --xpv-precision 50
+--exact-p-value T --mz-bin-width 0.05 --mz-bin-offset 0.0 --xpv-precision 50 --num-threads 12
+
+The source code of the HR-XPV calculation can be found in ./src/app/TideSearchApplication.cpp:1928
 
 
 For a gentle introduction to Crux, please see the Crux home page at
