@@ -16,6 +16,7 @@
 #include "util/StringUtils.h"
 #include <math.h> //Added by Andy Lin
 #include <map> //Added by Andy Lin
+#include "time.h"
 
 #define TAILOR_QUANTILE_TH 0.01
 #define TAILOR_OFFSET 5.0
@@ -253,10 +254,10 @@ int TideSearchApplication::main(const vector<string>& input_files, const string 
   // Read auxlocs index file
   carp(CARP_INFO, "Reading auxiliary locations.");  
   vector<const pb::AuxLocation*> locations;
-  if (!ReadRecordsToVector<pb::AuxLocation>(&locations, auxlocs_file)) {
+/*  if (!ReadRecordsToVector<pb::AuxLocation>(&locations, auxlocs_file)) {
     carp(CARP_FATAL, "Error reading index (%s)", auxlocs_file.c_str());
   }
-  carp(CARP_DEBUG, "Read %d auxiliary locations.", locations.size());
+*/  carp(CARP_DEBUG, "Read %d auxiliary locations.", locations.size());
 
   // Read peptides index file
   pb::Header peptides_header;
@@ -921,7 +922,8 @@ void TideSearchApplication::search(void* threadarg) {
       int* nRows = new int[nPepMassIntUniq];  // Added by AKF
       int max_offset = 0;   // Added by AKF for merging exact score distirbutinos
       double dTailorQuantile = 1.0; //new double[nPepMassIntUniq]; //Added by AKF
-      
+      double dp_time = 0.0;
+      dp_time = (double)clock();
       if (curScoreFunction != RESIDUE_EVIDENCE_MATRIX) {
         int pValueDistLen = 1; // Added by AKF
         for (pe = 0; pe < nPepMassIntUniq; pe++) { // TODO should probably instead use iterator over pepMassIntUnique
@@ -958,7 +960,6 @@ void TideSearchApplication::search(void* threadarg) {
           nRows[pe] = nRowDynProg; //Added by AKF          
 
           double pepMassDouble = ((double)pepMaInt - 0.5 + bin_offset) * bin_width;
-
           if (bin_width > BIN_WIDTH_TH){
             scoreOffsetObs[pe] = calcScoreCount(maxPrecurMassBin, &evidenceObs[pe][0], pepMaInt,
                                    maxEvidence, minEvidence, maxScore, minScore,
@@ -1090,6 +1091,7 @@ void TideSearchApplication::search(void* threadarg) {
         }  //End of Tailor
       }
       //END XCORR
+      dp_time = (double)(clock() - dp_time)/CLOCKS_PER_SEC; 
 
       //RES-EV
       //Create dyanamic programming matrix if there is a res-ev score greater than 0
@@ -1219,6 +1221,7 @@ void TideSearchApplication::search(void* threadarg) {
                 curScore.DPPeptideScore = bestDPPeptideScore;
                 curScore.DPPeptideTailor = (bestDPPeptideScore + TAILOR_OFFSET)/dTailorQuantile;
                 curScore.DPPeptideSeq = bestDPPeptide;
+                curScore.time = dp_time;
             }            
             
             //TODO ugly hack to conform with the way these indices are generated in standard tide-search

@@ -548,7 +548,7 @@ void TideMatchSet::writeToFile(
     flankingAAs = n_term + c_term;
 
     // look for other locations
-    if (peptide->HasAuxLocationsIndex()) {
+  /*  if (peptide->HasAuxLocationsIndex()) {
       const pb::AuxLocation* aux = locations[peptide->AuxLocationsIndex()];
       for (int j = 0; j < aux->location_size(); j++) {
         const pb::Location& location = aux->location(j);
@@ -560,7 +560,7 @@ void TideMatchSet::writeToFile(
         flankingAAs += "," + n_term + c_term;
       }
     }
-
+*/
     const SpScorer::SpScoreData* sp_data = sp_map ? &(sp_map->at(i).first) : NULL;
 
     if (rwlock != NULL) { rwlock->lock(); }
@@ -605,6 +605,7 @@ void TideMatchSet::writeToFile(
         *file << StringUtils::ToString(i->DPPeptideScore, precision, true) << '\t';
         *file << StringUtils::ToString(i->DPPeptideTailor, precision, true) << '\t';
         *file << i->DPPeptideSeq << '\t';
+        *file << StringUtils::ToString(i->time, precision, true) << '\t';
       }                  	        
       break;
     case RESIDUE_EVIDENCE_MATRIX:
@@ -753,6 +754,7 @@ void TideMatchSet::writeHeaders(
           colPrint(&writtenHeader, file, get_column_header(DP_PEPT_SCORE_COL));
           colPrint(&writtenHeader, file, get_column_header(DP_PEPT_TAILOR_COL));
           colPrint(&writtenHeader, file, get_column_header(DP_PEPT_SEQ_COL));
+          colPrint(&writtenHeader, file, "Time (s)");
         }                  		        
         if (!brief) {
           colPrint(&writtenHeader, file, get_column_header(XCORR_RANK_COL));
