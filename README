@@ -1,3 +1,30 @@
+This respository is a forked version of the crux-toolkit (http://crux.ms/).
+This crux-toolkit version contains the High-Resolution Exact P-Value method (HR-XPV) 
+in Tide-Search. HR-XPV method is describe in the paper: doi:XXX.
+Two binary files are provided, a compiled version of the crux with HR-XPV, 
+one for windows 10 (crux.exe) and another one compiled in Linux Ubuntu 
+v. 22.04.2 (crux). The binary files can be found in the root folder. 
+
+To activate the HR-XPV calculation in the Tide program, the user needs to 
+specify the parameters --exact-p-value T and --mz-bin-width 
+to be smaller than 1.0. When the parameter --mz-bin-width is greater 
+than 1.0, then Tide executes the original, standard XPV algorithm 
+(doi: https://doi.org/10.1074/mcp.o113.036327) developed for low-resolution 
+MS/MS data. We also note that Tide supports multi threading, so 
+HR-XPV can also be run with multi threads by specifying the --num-threads
+parameter bigger than 1. We also note that the HR-XPV is not 
+supported in combination with the Res-EV scoring method 
+(doi: https://doi.org/10.1021/acs.jproteome.8b00206) now. 
+The precision of the HR-XPV method can be specified with the 
+tide-search parameter called --xpv-precision. By default, this 
+value is set to 20.
+
+Basically you can activate the HR-XPV by adding the following parameters 
+to the command: 
+
+--exact-p-value T --mz-bin-width 0.05 --mz-bin-offset 0.0 --xpv-precision 50
+
+
 For a gentle introduction to Crux, please see the Crux home page at
 doc/user/crux.html or at http://crux.ms/.  Note that the HTML pages
 for individual Crux commands are generated automatically, so these
