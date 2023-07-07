@@ -19,6 +19,12 @@ The precision of the HR-XPV method can be specified with the
 tide-search parameter called --xpv-precision. By default, this 
 value is set to 20.
 
+Basically you can activate the HR-XPV by adding the following parameters 
+to the command: 
+
+--exact-p-value T --mz-bin-width 0.05 --mz-bin-offset 0.0 --xpv-precision 50
+
+
 For a gentle introduction to Crux, please see the Crux home page at
 doc/user/crux.html or at http://crux.ms/.  Note that the HTML pages
 for individual Crux commands are generated automatically, so these
