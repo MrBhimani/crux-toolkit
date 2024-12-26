@@ -775,9 +775,9 @@ Params::Params() : finalized_(false) {
     "Fast, but heuristic PSM score calibration[[html: as described in "
     "<a href=\"https://pubmed.ncbi.nlm.nih.gov/32175744/\">this article</a>]].",
     "Available for tide-search", true);    
-  InitBoolParam("DP-peptide", false,
-    "Extract the best scoring peptide sequence from the Dynamic Programming table with "
-    "backtracking.[[html: as described in <a href=\"\">TBA</a>]].",
+  InitBoolParam("seva", false,
+    "Extract the best scoring peptide sequence variation from the Dynamic Programming "
+    "table with backtracking.[[html: as described in <a href=\"\">TBA</a>]].",
     "Available for tide-search", true);    
  //Added by AKF
   InitBoolParam("cross-corr-penalty", true,

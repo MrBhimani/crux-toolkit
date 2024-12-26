@@ -58,9 +58,9 @@ static const char* match_column_strings[NUMBER_MATCH_COLUMNS] = {
   "combined p-value rank", //Added by Andy Lin
   "Sidak adjusted p-value",  
   "tailor score",  //Added for tailor score calibration method by AKF  
-  "DP peptide score",  //Added for best scoring peptide from DP by AKF
-  "DP peptide tailor", //Added for best scoring peptide from DP by AKF
-  "DP peptide seq",    //Added for best scoring peptide from DP by AKF     
+  "SeVa-peptide-score",  //Added for best scoring peptide from DP by AKF
+  "SeVa-peptide-tailor", //Added for best scoring peptide from DP by AKF
+  "SeVa-peptide",    //Added for best scoring peptide from DP by AKF     
   "e-value",
   "smoothed p-value",
   "distinct matches/peptide",

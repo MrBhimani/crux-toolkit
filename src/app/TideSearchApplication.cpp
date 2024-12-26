@@ -973,7 +973,7 @@ void TideSearchApplication::search(void* threadarg) {
                                    nAARes, dAAFreqN, dAAFreqI, dAAFreqC, aaMassDouble, &vBacktracking,
                                    pValueScoreObs[pe]);
                                    
-            if (Params::GetBool("DP-peptide") && !vBacktracking.empty()){
+            if (Params::GetBool("seva") && !vBacktracking.empty()){
                 
               vector< pair <int,int> >::iterator itrBackTrack;
 //              printf("getting the DP peptide Seq\n");
@@ -1217,7 +1217,7 @@ void TideSearchApplication::search(void* threadarg) {
               curScore.tailor = (curScore.xcorr_score + TAILOR_OFFSET)/dTailorQuantile;
               //curScore.tailor = 1.0;//pValue_refact_xcorr;
             }            
-            if (Params::GetBool("DP-peptide")) {
+            if (Params::GetBool("seva")) {
                 curScore.DPPeptideScore = bestDPPeptideScore;
                 curScore.DPPeptideTailor = (bestDPPeptideScore + TAILOR_OFFSET)/dTailorQuantile;
                 curScore.DPPeptideSeq = bestDPPeptide;
@@ -1771,7 +1771,7 @@ vector<string> TideSearchApplication::getOptions() const {
     "use-neutral-loss-peaks",
     "use-z-line",
     "use-tailor-calibration",  
-    "DP-peptide",    	    
+    "seva",    	    
     "verbosity"
   };
   return vector<string>(arr, arr + sizeof(arr) / sizeof(string));
