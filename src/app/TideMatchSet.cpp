@@ -601,7 +601,7 @@ void TideMatchSet::writeToFile(
       if (Params::GetBool("use-tailor-calibration")) {
         *file << StringUtils::ToString(i->tailor, precision, true) << '\t';
       }
-      if (Params::GetBool("DP-peptide")){ //Added by AKF for reporting the best scoring peptide seq from DP table
+      if (Params::GetBool("seva")){ //Added by AKF for reporting the best scoring peptide seq from DP table
         *file << StringUtils::ToString(i->DPPeptideScore, precision, true) << '\t';
         *file << StringUtils::ToString(i->DPPeptideTailor, precision, true) << '\t';
         *file << i->DPPeptideSeq << '\t';
@@ -750,7 +750,7 @@ void TideMatchSet::writeHeaders(
         if (Params::GetBool("use-tailor-calibration")) {
           colPrint(&writtenHeader, file, get_column_header(TAILOR_COL));
         }
-        if (Params::GetBool("DP-peptide")){   //Added for best scoring peptide from DP by AKF        
+        if (Params::GetBool("seva")){   //Added for best scoring peptide from DP by AKF        
           colPrint(&writtenHeader, file, get_column_header(DP_PEPT_SCORE_COL));
           colPrint(&writtenHeader, file, get_column_header(DP_PEPT_TAILOR_COL));
           colPrint(&writtenHeader, file, get_column_header(DP_PEPT_SEQ_COL));
